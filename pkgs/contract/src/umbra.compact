@@ -1,0 +1,115 @@
+pragma language_version >= 0.16 && <= 0.22;
+
+import CompactStandardLibrary;
+
+// Umbra: anonymous submit -> blind grade -> provable reveal.
+//
+// Design:
+//  - A submitter's identity is never written to the ledger. Only a derived
+//    public key (a hash of a private key witness) is stored, and only so a
+//    later reveal() call can prove "submission #N is mine" by re-deriving
+//    the same key from the same secret.
+//  - The grader scores submissions by numeric id alone; the ledger never
+//    associates an id with a name, wallet, or any other identifying data.
+//  - Once graded, a grade is immutable. A submitter can only "claim" it
+//    (reveal()) by proving both (a) they hold the secret key matching the
+//    stored owner key for that id, and (b) they hold the original work
+//    content + salt matching the stored commitment. Nothing about the grade
+//    itself changes at reveal time -- reveal only binds an identity to an
+//    already-final decision.
+
+export sealed ledger assignment_id: Bytes<32>;
+export sealed ledger grader_key:    Bytes<32>;
+
+export ledger submission_count: Counter;
+export ledger commitments: Map<Uint<64>, Bytes<32>>;
+export ledger owner_keys:   Map<Uint<64>, Bytes<32>>;
+export ledger grades:       Map<Uint<64>, Uint<8>>;
+export ledger graded_ids:   Set<Uint<64>>;
+export ledger revealed_ids: Set<Uint<64>>;
+export ledger nullifiers:   Set<Bytes<32>>;
+
+// Every submitter and the grader hold their own secret key locally; the
+// contract only ever sees a domain-separated hash of it.
+witness local_secret_key(): Bytes<32>;
+
+// The submitter's own copy of what they're submitting -- computed off-chain,
+// supplied here only so the circuit can hash it into a commitment.
+witness get_work_hash(): Bytes<32>;
+witness get_salt():      Bytes<32>;
+
+export pure circuit derive_pk(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "umbra:pk:v1"), sk]);
+}
+
+pure circuit derive_nullifier(sk: Bytes<32>, aid: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([pad(32, "umbra:null:v1"), sk, aid]);
+}
+
+pure circuit make_commitment(work_hash: Bytes<32>, salt: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([work_hash, salt]);
+}
+
+constructor(aid: Bytes<32>, grader_pk: Bytes<32>) {
+  assignment_id = disclose(aid);
+  grader_key    = disclose(grader_pk);
+}
+
+// Anyone eligible (i.e. anyone who can compute a fresh nullifier for this
+// assignment) can submit once. No name, wallet, or index position is
+// recorded -- just a commitment and a derived key, both opaque without the
+// matching secret.
+export circuit submit(): [] {
+  const sk = local_secret_key();
+  const nf = disclose(derive_nullifier(sk, assignment_id));
+  assert(!nullifiers.member(nf), "Already submitted for this assignment");
+
+  const work_hash  = get_work_hash();
+  const salt       = get_salt();
+  const commitment = disclose(make_commitment(work_hash, salt));
+  const pk         = disclose(derive_pk(sk));
+
+  const id = submission_count.read();
+  commitments.insert(id, commitment);
+  owner_keys.insert(id, pk);
+  nullifiers.insert(nf);
+  submission_count.increment(1);
+}
+
+// Only the holder of grader_key's matching secret can call this. Scores an
+// anonymous submission id -- the grader never learns, and the ledger never
+// records, who that id belongs to.
+export circuit grade(id: Uint<64>, score: Uint<8>): [] {
+  const sk = local_secret_key();
+  const pk = disclose(derive_pk(sk));
+  assert(pk == grader_key, "Not the authorized grader");
+
+  const gid = disclose(id);
+  assert(commitments.member(gid), "No such submission");
+  assert(!graded_ids.member(gid), "Already graded");
+
+  const gscore = disclose(score);
+  grades.insert(gid, gscore);
+  graded_ids.insert(gid);
+}
+
+// The submitter proves ownership of a graded submission id by re-deriving
+// the same key and re-hashing the same work + salt they submitted with.
+// The grade itself was already final before this call; reveal only binds
+// an identity to it.
+export circuit reveal(id: Uint<64>): [] {
+  const rid = disclose(id);
+  assert(graded_ids.member(rid), "Not graded yet");
+  assert(!revealed_ids.member(rid), "Already revealed");
+
+  const sk = local_secret_key();
+  const pk = disclose(derive_pk(sk));
+  assert(pk == owner_keys.lookup(rid), "Not the submission owner");
+
+  const work_hash = get_work_hash();
+  const salt       = get_salt();
+  const computed   = disclose(make_commitment(work_hash, salt));
+  assert(computed == commitments.lookup(rid), "Commitment mismatch");
+
+  revealed_ids.insert(rid);
+}

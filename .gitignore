@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Compact compiler output (regenerate with `npm run contract:compile`)
+pkgs/contract/src/managed/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Env
+.env
+.env.local
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

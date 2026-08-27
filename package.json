@@ -1,0 +1,15 @@
+{
+  "name": "umbra",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": [
+    "pkgs/*"
+  ],
+  "scripts": {
+    "contract:compile": "npm run compact --workspace=@umbra/contract",
+    "contract:build": "npm run build --workspace=@umbra/contract",
+    "contract:test": "npm run test --workspace=@umbra/contract",
+    "test": "npm run contract:test"
+  }
+}
