@@ -13,6 +13,12 @@ pkgs/contract/src/managed/
 npm-debug.log*
 logs/
 
+# Wallet / private-state secrets -- never commit these. Contains serialized
+# wallet state (pkgs/cli/wallet-cache/) and private-state LevelDB data
+# (secret keys, work hashes, salts) written by CLI runs against a real network.
+wallet-cache/
+midnight-level-db/
+
 # Env
 .env
 .env.local

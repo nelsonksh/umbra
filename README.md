@@ -49,10 +49,42 @@ pkgs/
     src/umbra-witnesses.ts     # TypeScript witness implementations (private state)
     src/test/                  # Vitest simulator tests
     src/managed/                # compiler output (zkIR, keys, compiled JS) — gitignored, regenerate below
+  cli/
+    src/api.ts                 # wallet/provider bootstrap + deploy/submit/grade/reveal calls
+    src/smoke-test.ts          # end-to-end real-network run: deploy -> submit -> grade -> reveal
 ```
 
-More packages (a CLI and a browser frontend, mirroring the Midnight ecosystem's usual
-`contract` / `shared` / `cli` / `app` shape) will be added as the demo is built out.
+A browser frontend (`pkgs/app`) is next.
+
+## Real-network smoke test
+
+Beyond the simulator, `pkgs/cli` deploys the actual compiled contract to a running Midnight
+network and calls `submit()` / `grade()` / `reveal()` for real — real ZK proof generation via
+the proof server, real transactions, real block confirmations. Verified end-to-end against the
+local network described in [`../midnight-local-dev`](https://github.com/midnightntwrk/midnight-local-dev):
+
+```bash
+# terminal 1 — bring up the local network (see midnight-local-dev's README)
+cd midnight-local-dev && docker compose -f standalone.yml up -d
+
+# terminal 2 — run the smoke test; it prints an address and waits for funds
+cd umbra && npm run smoke-test --workspace=@umbra/cli
+
+# terminal 1 (or a genesis-funded script) — send the printed address some tNight,
+# e.g. via midnight-local-dev's funding tool, then the smoke test continues on its own
+```
+
+One funded wallet plays both roles (grader and submitter) across the run — see the comment on
+`setUmbraIdentity()` in `pkgs/cli/src/api.ts` for why that's safe: the contract only ever sees
+a derived key from whichever logical secret key is active in private state when a circuit
+runs, never the underlying wallet identity. A real run produces output like:
+
+```
+Deployed Umbra contract at: b7dd65c92e33367bdf2aa7d891ae33deec5b777d2a02273bfdb4b83793d88020
+Submit TX ... added in block 9042 -- submission_count=1
+Grade TX  ... added in block 9045 -- graded_ids has 0 = true, grade = 85
+Reveal TX ... added in block 9048 -- revealed_ids has 0 = true
+```
 
 ## Setup
 
@@ -92,7 +124,9 @@ Both commands are also runnable directly inside `pkgs/contract` (`npm run compac
 - [x] Local Midnight dev network verified (node, indexer, proof server)
 - [x] Compact toolchain installed and pinned (compactc 0.30.0)
 - [x] `submit()` / `grade()` / `reveal()` circuits compile and pass a real test suite
-- [ ] End-to-end web demo (frontend + local-network deployment)
+- [x] Real-network deployment verified: `submit()` → `grade()` → `reveal()` run against the
+      local network with real ZK proofs and real block confirmations (`pkgs/cli`)
+- [ ] Browser frontend (`pkgs/app`)
 - [ ] Cardano / Andamio credential-mint bridge (Wave 2+, see the deck)
 
 ## License
