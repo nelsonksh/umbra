@@ -10,6 +10,8 @@
     "contract:compile": "npm run compact --workspace=@umbra/contract",
     "contract:build": "npm run build --workspace=@umbra/contract",
     "contract:test": "npm run test --workspace=@umbra/contract",
+    "sync-keys": "rm -rf pkgs/app/public/managed/umbra && mkdir -p pkgs/app/public/managed && cp -R pkgs/contract/src/managed/umbra pkgs/app/public/managed/umbra",
+    "app:dev": "npm run sync-keys && npm run dev --workspace=@umbra/app",
     "test": "npm run contract:test"
   }
 }

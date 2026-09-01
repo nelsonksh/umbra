@@ -52,9 +52,10 @@ pkgs/
   cli/
     src/api.ts                 # wallet/provider bootstrap + deploy/submit/grade/reveal calls
     src/smoke-test.ts          # end-to-end real-network run: deploy -> submit -> grade -> reveal
+  app/
+    src/lib/                   # Lace wallet connector, providers, contract calls
+    src/components/            # Submit / Grade / Reveal / ledger-state panels
 ```
-
-A browser frontend (`pkgs/app`) is next.
 
 ## Real-network smoke test
 
@@ -85,6 +86,25 @@ Submit TX ... added in block 9042 -- submission_count=1
 Grade TX  ... added in block 9045 -- graded_ids has 0 = true, grade = 85
 Reveal TX ... added in block 9048 -- revealed_ids has 0 = true
 ```
+
+## Browser frontend
+
+`pkgs/app` is a React + Vite dApp that connects via the [Lace wallet](https://www.lace.io/)
+extension (set Lace's network to "Undeployed" to match the local network). One browser session
+can hold several named local "identities" (each just a secret key kept in `localStorage`) and
+switch between them to act as different submitters or the grader — the connected wallet only
+ever pays fees and signs transactions; Umbra's own notion of identity is entirely separate (see
+`derive_pk()` in the contract). The UI covers the full flow: deploy a new assignment or join an
+existing one by contract address, submit, grade, reveal, and a live ledger-state view.
+
+```bash
+npm run app:dev   # syncs the compiled contract's ZK assets into pkgs/app/public, then starts Vite
+```
+
+`pkgs/app/vite.config.ts` carries a fair amount of build-shim code (CJS/ESM interop for a few
+Node polyfills, a WASM loader shim, a same-origin proxy for proof-server requests since Lace's
+service worker blocks page-level fetches to `127.0.0.1`) adapted from Midnight's own
+`example-counter` template — see the comments in that file before touching it.
 
 ## Setup
 
@@ -126,7 +146,10 @@ Both commands are also runnable directly inside `pkgs/contract` (`npm run compac
 - [x] `submit()` / `grade()` / `reveal()` circuits compile and pass a real test suite
 - [x] Real-network deployment verified: `submit()` → `grade()` → `reveal()` run against the
       local network with real ZK proofs and real block confirmations (`pkgs/cli`)
-- [ ] Browser frontend (`pkgs/app`)
+- [x] Browser frontend (`pkgs/app`) — builds clean, typechecks clean, verified rendering
+      correctly with working error handling (wallet-not-found path) in a headless browser;
+      the deploy/submit/grade/reveal click-through itself still needs a real Lace extension
+      to verify, which wasn't available in that environment
 - [ ] Cardano / Andamio credential-mint bridge (Wave 2+, see the deck)
 
 ## License

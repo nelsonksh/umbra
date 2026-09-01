@@ -7,6 +7,8 @@ dist/
 
 # Compact compiler output (regenerate with `npm run contract:compile`)
 pkgs/contract/src/managed/
+# Copy of the same output for the browser app (regenerate with `npm run sync-keys`)
+pkgs/app/public/managed/
 
 # Logs
 *.log
