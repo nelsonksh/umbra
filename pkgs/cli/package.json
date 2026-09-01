@@ -5,7 +5,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "smoke-test": "node --no-warnings --experimental-specifier-resolution=node --loader ts-node/esm src/smoke-test.ts",
+    "smoke-test": "node --no-warnings --experimental-specifier-resolution=node --loader ts-node/esm src/smoke-test.ts standalone",
+    "smoke-test:preview": "node --max-old-space-size=4096 --no-warnings --experimental-specifier-resolution=node --loader ts-node/esm src/smoke-test.ts preview",
+    "smoke-test:preprod": "node --max-old-space-size=4096 --no-warnings --experimental-specifier-resolution=node --loader ts-node/esm src/smoke-test.ts preprod",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

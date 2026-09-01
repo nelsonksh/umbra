@@ -9,16 +9,30 @@
  * private state when a circuit runs, never the underlying wallet identity.
  *
  * Usage:
- *   npm run smoke-test --workspace=@umbra/cli
- * This will print an unshielded address and block waiting for funds. Fund
- * it from a second terminal via midnight-local-dev, e.g.:
- *   cd ../../../midnight-local-dev && npm start
- *   -> [2] Fund accounts by public key, paste the printed address
+ *   npm run smoke-test --workspace=@umbra/cli            # local network (default)
+ *   npm run smoke-test:preview --workspace=@umbra/cli    # public Preview testnet
+ *   npm run smoke-test:preprod --workspace=@umbra/cli    # public Preprod testnet
+ *
+ * Either way this prints an unshielded address and blocks waiting for
+ * funds:
+ *   - local: fund it from a second terminal via midnight-local-dev, e.g.
+ *     `cd ../../../midnight-local-dev && npm start` -> [2] Fund accounts by
+ *     public key, paste the printed address.
+ *   - preview/preprod: paste the printed address into the matching faucet
+ *     (https://faucet.preview.midnight.network/ or
+ *     https://faucet.preprod.midnight.network/) -- both have a
+ *     human-verification check, so this step can't be automated.
+ *
+ * Prefer preview over preprod: preprod has ~4x the chain history (as of
+ * writing), and a from-scratch wallet sync against it can take 25+ minutes
+ * and needs a raised --max-old-space-size (see package.json scripts) to
+ * avoid an OOM crash.
  */
 
-import { StandaloneConfig } from "./config.js";
+import { StandaloneConfig, PreviewConfig, PreprodConfig } from "./config.js";
 import {
   buildFreshWallet,
+  buildWalletAndWaitForFunds,
   configureUmbraProviders,
   setUmbraIdentity,
   deployUmbra,
@@ -37,11 +51,20 @@ const randomBytes32 = (): Uint8Array => {
 };
 
 async function main() {
-  const config = new StandaloneConfig();
+  const network = process.argv[2] ?? "standalone";
+  const config =
+    network === "preprod" ? new PreprodConfig() :
+    network === "preview" ? new PreviewConfig() :
+    new StandaloneConfig();
 
-  console.log("\n=== Umbra real-network smoke test ===\n");
+  console.log(`\n=== Umbra real-network smoke test (${network}) ===\n`);
 
-  const walletCtx = await buildFreshWallet(config);
+  // UMBRA_WALLET_SEED lets a retry reuse an already-funded address instead
+  // of generating a fresh one and needing a new faucet grant.
+  const reuseSeed = process.env.UMBRA_WALLET_SEED;
+  const walletCtx = reuseSeed
+    ? await buildWalletAndWaitForFunds(config, reuseSeed)
+    : await buildFreshWallet(config);
   const providers = await configureUmbraProviders(walletCtx, config);
 
   // Two logical identities, both operating through the one funded wallet.
