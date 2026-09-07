@@ -30,11 +30,17 @@ export function IdentityPicker({ onChange }: { onChange: (identity: Identity | n
     const name = newName.trim();
     if (!name) return;
     const identity = createIdentity(name);
-    const all = [...identities, identity];
-    setIdentities(all);
+    setIdentities((prev) => [...prev, identity]);
     setNewName("");
-    select(identity.name);
-  }, [newName, identities, select]);
+    // Select the identity we just created directly, rather than going
+    // through select()'s lookup -- select() closes over `identities` from
+    // this render, which doesn't include `identity` yet (setIdentities
+    // above won't be visible until the next render), so that lookup would
+    // silently miss and call onChange(null).
+    setActiveName(identity.name);
+    setActiveIdentityName(identity.name);
+    onChange(identity);
+  }, [newName, onChange]);
 
   return (
     <section className="panel">
